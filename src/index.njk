@@ -1,0 +1,30 @@
+---
+title: RISC-V Base I Reference
+---
+<h1>The Best RISC-V Instruction Set Reference Manual</h1>
+
+<p>
+This MVP lists all base integer (I) instructions for RV32 and RV64, with one page per instruction. Type a mnemonic to jump.
+</p>
+
+
+<ul id="list">
+{% for inst in instructions %}
+  <li data-name="{{ inst.name }} {{ inst.longName | lower }}">
+    <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
+    — {{ inst.longName }}
+    {% if inst.base == 64 %}<em>(RV64 only)</em>{% endif %}
+  </li>
+{% endfor %}
+</ul>
+
+
+
+<style>
+body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+ul { list-style: none; padding: 0; }
+li { margin: 6px 0; }
+a { text-decoration: none; color: #0366d6; }
+a:hover { text-decoration: underline; }
+</style>
+

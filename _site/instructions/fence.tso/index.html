@@ -1,0 +1,19 @@
+<h1>fence.tso</h1>
+
+<p>Orders memory operations.
+
+`fence.tso` orders all load operations
+in its predecessor set before all memory operations in its successor set, and all store operations
+in its predecessor set before all store operations in its successor set. This leaves non-AMO store
+operations in the &#39;fence.tso&#39;s predecessor set unordered with non-AMO loads in its successor set.
+
+The `xs1` and `xd` fields are unused and ignored.
+
+In modes other than M-mode, `fence.tso` is further affected by `menvcfg.FIOM`,
+`senvcfg.FIOM`&lt;% if ext?(:H) %&gt;, and/or `henvcfg.FIOM`&lt;% end %&gt;.
+</p>
+
+<section>
+  <h2>Synopsis</h2>
+  <pre><code>fence.tso</code></pre>
+</section>

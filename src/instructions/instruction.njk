@@ -1,0 +1,17 @@
+---
+pagination:
+  data: instructions
+  size: 1
+  alias: inst
+permalink: instructions/{{ inst.name }}/index.html
+eleventyComputed:
+  title: "{{ inst.name }}"
+---
+<h1>{{ inst.name }}</h1>
+
+<p>{{ inst.description }}</p>
+
+<section>
+  <h2>Synopsis</h2>
+  <pre><code>{{ inst.syntax }}</code></pre>
+</section>

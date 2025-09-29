@@ -3,7 +3,7 @@ const path = require("path");
 const yaml = require("js-yaml");
 
 // Root to UDB I-extension instruction YAMLs
-const I_DIR = path.join(process.cwd(), "udb", "spec", "std", "isa", "inst", "I");
+const I_DIR = path.join(process.cwd(), "riscv-unified-db", "spec", "std", "isa", "inst", "I");
 
 function readYamlFile(p) {
   const txt = fs.readFileSync(p, "utf8");

@@ -1,24 +1,30 @@
 ---
-title: RISC-V Base I Reference
+title: RISC-V Instruction Extensions
 ---
 <h1>The Best RISC-V Instruction Set Reference Manual</h1>
 
 <p>
-This MVP lists all base integer (I) instructions for RV32 and RV64, with one page per instruction. Type a mnemonic to jump.
+Browse the instruction set by extension. Pick an extension to see every instruction defined inside it.
 </p>
 
+<p class="primary-callout">
+The base integer <strong>I</strong> extension is the most widely implemented set of instructions—start there if you're looking for the core ISA.
+</p>
 
-<ul id="list">
-{% for inst in instructions %}
-  <li data-name="{{ inst.name }} {{ inst.longName | lower }}">
-    <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
-    — {{ inst.longName }}
-    {% if inst.base == 64 %}<em>(RV64 only)</em>{% endif %}
+<ul id="extensions">
+{% for ext in extensions %}
+  <li data-name="{{ ext.name | lower }}">
+    <a href="/extensions/{{ ext.slug }}/">{{ ext.name }}</a>
+    <p class="extension-description">
+      {% if ext.description %}
+        {{ ext.description }}
+      {% else %}
+        Description coming soon.
+      {% endif %}
+    </p>
   </li>
 {% endfor %}
 </ul>
-
-
 
 <style>
 body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
@@ -26,5 +32,6 @@ ul { list-style: none; padding: 0; }
 li { margin: 6px 0; }
 a { text-decoration: none; color: #0366d6; }
 a:hover { text-decoration: underline; }
+.primary-callout { background: #f1f8ff; border-left: 4px solid #0366d6; padding: 12px; margin: 1rem 0; }
+.extension-description { margin: 4px 0 0; color: #586069; font-size: 0.9rem; }
 </style>
-

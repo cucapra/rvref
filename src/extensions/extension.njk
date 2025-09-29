@@ -1,0 +1,35 @@
+---
+pagination:
+  data: extensions
+  size: 1
+  alias: extension
+permalink: extensions/{{ extension.slug }}/index.html
+eleventyComputed:
+  title: "{{ extension.name }} Extension"
+---
+<h1>{{ extension.name }} Extension</h1>
+
+<p>
+  {{ extension.count }} instructions in the {{ extension.name }} extension.
+</p>
+
+<ul class="instruction-list">
+{% for inst in extension.instructions %}
+  <li data-name="{{ inst.name | lower }}">
+    <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
+    — {{ inst.longName }}
+    <span class="meta">Base width: {{ inst.base }}</span>
+  </li>
+{% endfor %}
+</ul>
+
+<style>
+body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+ul { list-style: none; padding: 0; }
+li { margin: 6px 0; }
+a { text-decoration: none; color: #0366d6; }
+a:hover { text-decoration: underline; }
+small { color: #555; margin-left: 8px; }
+.meta { display: block; color: #555; margin-top: 2px; }
+</style>
+

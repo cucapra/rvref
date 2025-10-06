@@ -18,7 +18,9 @@ eleventyComputed:
   <li data-name="{{ inst.name | lower }}">
     <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
     — {{ inst.longName }}
-    <span class="meta">Base width: {{ inst.base }}</span>
+    {% if inst.base == 64 %}
+      <span class="meta">Base width: {{ inst.base }}</span>
+    {% endif %}
   </li>
 {% endfor %}
 </ul>

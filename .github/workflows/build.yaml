@@ -1,0 +1,50 @@
+name: docs
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+      - name: Build
+        run: npm run build
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{github.event_name=='push' && github.ref=='refs/heads/main' && github.repository_owner == 'cucapra'}}
+    steps:
+      - name: Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+      - run: ls -R
+      - name: rsync
+        env:
+          DEPLOY_HOST: courses.cit.cornell.edu
+          DEPLOY_USER: als485
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_SRC: ./book/
+          DEPLOY_DEST: coursewww/capra.cs.cornell.edu/htdocs/rvref
+        run: |
+          echo "$DEPLOY_KEY" > pk
+          echo "$DEPLOY_KNOWN_HOSTS" > kh
+          chmod 600 pk
+          rsync --compress --recursive --checksum --itemize-changes --delete \
+            --perms --chmod=Du=rwx,Dgo=rx,Fu=rw,Fog=r \
+            -e "ssh -i pk -o 'UserKnownHostsFile kh'" \
+            $DEPLOY_SRC $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DEST

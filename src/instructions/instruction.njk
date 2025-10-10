@@ -20,7 +20,7 @@ eleventyComputed:
   <h2>Encoding</h2>
   <p><strong>Type:</strong> {{ inst.encodingType or "" }}</p>
   <div class="encoding">
-    <div class="bitbar">
+    <div class="bitfield">
       {% set fields = inst.encoding.fields %}
       {% for f in fields %}
         <div class="field {{ f.kind }}" style="flex: {{ f.width }}">
@@ -48,7 +48,7 @@ eleventyComputed:
 
 <style>
 .encoding { border: 1px solid #ddd; padding: 0.75rem; border-radius: 8px; }
-.bitbar { display: flex; gap: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.bitfield { display: flex; gap: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .field { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 6px; text-align: center; }
 .field.const { background: #eef7ff; border-color: #cfe7ff; }
 .label { font-weight: 600; }

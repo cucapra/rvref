@@ -17,8 +17,8 @@ This project uses [Node.js][node] and npm, so install those first.
 Get the source code:
 
 ```bash
-git clone git@github.com:cucapra/rvref.git
-cd rvref
+git clone git@github.com:cucapra/riscv.fyi.git
+cd riscv.fyi
 git submodule update --init
 ```
 

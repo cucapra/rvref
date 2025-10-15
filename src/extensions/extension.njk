@@ -19,7 +19,7 @@ eleventyComputed:
     <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
     — {{ inst.longName }}
     {% if inst.base != 32 %}
-      <span class="base-width">{{ inst.base }}</span>
+      <span class="base-width" title="This instruction is only present in the {{inst.base}}-bit version of the ISA.">{{ inst.base }}</span>
     {% endif %}
   </li>
 {% endfor %}

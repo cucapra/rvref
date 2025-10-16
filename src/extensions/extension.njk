@@ -18,8 +18,8 @@ eleventyComputed:
   <li data-name="{{ inst.name | lower }}">
     <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
     — {{ inst.longName }}
-    {% if inst.base == 64 %}
-      <span class="meta">Base width: {{ inst.base }}</span>
+    {% if inst.base != 32 %}
+      <span class="base-width" title="This instruction is only present in the {{inst.base}}-bit version of the ISA.">{{ inst.base }}</span>
     {% endif %}
   </li>
 {% endfor %}
@@ -32,6 +32,15 @@ li { margin: 6px 0; }
 a { text-decoration: none; color: #0366d6; }
 a:hover { text-decoration: underline; }
 small { color: #555; margin-left: 8px; }
-.meta { display: block; color: #555; margin-top: 2px; }
+.base-width {
+  display: inline-block;
+  color: white;
+  background: #6699d6;
+  border-radius: 6px;
+  font-size: 80%;
+  font-weight: bold;
+  padding: 1px 3px;
+  margin-left: 3px;
+}
 </style>
 

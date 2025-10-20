@@ -137,6 +137,22 @@ module.exports = function loadInstructions() {
         }
       }
 
+      const bitfieldJSON = {
+        reg: fields.map(f => {
+          let name = f.label;
+          if (f.kind === "const" && typeof name === "string") {
+            const idx = name.indexOf("=");
+            if (idx !== -1 && idx + 1 < name.length) {
+              name = name.slice(idx + 1);
+            }
+          }
+          return {
+            name,
+            bits: f.width
+          };
+        })
+      };
+
       instructions.push({
         name,
         longName,
@@ -155,7 +171,8 @@ module.exports = function loadInstructions() {
           funct7
         },
         extension,
-        extensionSlug: slugifyExtension(extension)
+        extensionSlug: slugifyExtension(extension),
+        bitfieldJSON
       });
     }
   }

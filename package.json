@@ -15,6 +15,7 @@
     "@11ty/eleventy": "^3.1.2"
   },
   "dependencies": {
+    "bit-field": "^1.9.0",
     "js-yaml": "^4.1.0"
   }
 }

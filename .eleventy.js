@@ -6,6 +6,7 @@ module.exports = function(eleventyConfig) {
     return String(range);
   });
 
+  eleventyConfig.addPassthroughCopy({ "node_modules/bit-field": "bitfield" });
   return {
     dir: {
       input: "src",

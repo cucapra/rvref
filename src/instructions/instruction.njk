@@ -18,22 +18,124 @@ eleventyComputed:
 
 <section>
   <h2>Encoding</h2>
+
   <p><strong>Type:</strong> {{ inst.encodingType or "" }}</p>
-  <div class="encoding">
-    <div class="bitfield">
-      {% set fields = inst.encoding.fields %}
-      {% for f in fields %}
-        <div class="field {{ f.kind }}" style="flex: {{ f.width }}">
-          <div class="label">{{ f.label }}</div>
-          <div class="range">bits {{ f.from }}..{{ f.to }}</div>
-        </div>
-      {% endfor %}
-    </div>
-    <div class="bits">
-      {% if inst.encoding.funct7 %}<div><strong>funct7</strong>: {{ inst.encoding.funct7 }}</div>{% endif %}
-      {% if inst.encoding.funct3 %}<div><strong>funct3</strong>: {{ inst.encoding.funct3 }}</div>{% endif %}
-      {% if inst.encoding.opcode %}<div><strong>opcode</strong>: {{ inst.encoding.opcode }}</div>{% endif %}
-    </div>
+
+  <div class="bitfield-diagram">
+    <script type="text/bitfield">
+    {{ inst.bitfieldJSON | dump | safe }}
+    </script>
+  </div>
+
+  <script>
+  (function () {
+    function jsonmlToDom(node, inSvg) {
+      if (node === null || node === undefined) return null;
+      if (typeof node === "string" || typeof node === "number") {
+        return document.createTextNode(String(node));
+      }
+      if (!Array.isArray(node) || node.length === 0) return null;
+
+      const [tagName, ...rest] = node;
+      let attrs = {};
+      let children = rest;
+
+      if (children.length && typeof children[0] === "object" && !Array.isArray(children[0])) {
+        attrs = children.shift() || {};
+      }
+
+      const isSvgNode = inSvg || tagName === "svg";
+      const element = isSvgNode
+        ? document.createElementNS("http://www.w3.org/2000/svg", tagName)
+        : document.createElement(tagName);
+
+      Object.entries(attrs).forEach(([key, value]) => {
+        element.setAttribute(key, value);
+      });
+
+      children.forEach(child => {
+        const childNode = jsonmlToDom(child, isSvgNode);
+        if (childNode) element.appendChild(childNode);
+      });
+
+      return element;
+    }
+
+    function parseBitfieldData(raw) {
+      if (!raw) return null;
+      try {
+        const payload = JSON.parse(raw);
+        if (Array.isArray(payload)) {
+          return { segments: payload };
+        }
+        if (payload && Array.isArray(payload.reg)) {
+          return { segments: payload.reg, options: payload.options };
+        }
+        if (payload && Array.isArray(payload.fields)) {
+          return { segments: payload.fields, options: payload.options };
+        }
+      } catch (err) {
+        console.warn("Failed to parse bitfield JSON", err);
+      }
+      return null;
+    }
+
+    function renderBitfieldScripts() {
+      const scripts = document.querySelectorAll('script[type="text/bitfield"]');
+      if (!scripts.length) return;
+
+      scripts.forEach(scriptEl => {
+        const container = scriptEl.parentElement;
+        if (!container) return;
+
+        if (!window.bitfield || typeof window.bitfield.render !== "function") {
+          console.warn("bitfield.render is not available");
+          return;
+        }
+
+        const parsed = parseBitfieldData(scriptEl.textContent.trim());
+        if (!parsed || !Array.isArray(parsed.segments) || !parsed.segments.length) return;
+
+        const segments = parsed.segments
+          .map(seg => {
+            const bits = Number(seg.bits ?? seg.width ?? 0);
+            return Object.assign({}, seg, { bits });
+          })
+          .filter(seg => seg.bits > 0);
+
+        if (!segments.length) return;
+
+        const totalBits = segments.reduce((sum, seg) => sum + seg.bits, 0);
+        const options = Object.assign({ bits: totalBits }, parsed.options || {});
+
+        try {
+          const jsonml = window.bitfield.render(segments, options);
+          const svgNode = jsonmlToDom(jsonml, false);
+          if (svgNode) {
+            container.insertBefore(svgNode, scriptEl);
+          }
+        } catch (err) {
+          console.error("Failed to render bitfield", err);
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", renderBitfieldScripts);
+  })();
+  </script>
+
+  <div class="bits">
+    {% for f in inst.encoding.fields %}
+      {% if "funct7" in f.label %}
+        <div><strong>funct7</strong>: bits {{ f.from }}..{{ f.to }}</div>
+      {% endif %}
+      {% if "funct3" in f.label %}
+        <div><strong>funct3</strong>: bits {{ f.from }}..{{ f.to }}</div>
+      {% endif %}
+      {% if "opcode" in f.label %}
+        <div><strong>opcode</strong>: bits {{ f.from }}..{{ f.to }}</div>
+      {% endif %}
+    {% endfor %}
   </div>
 </section>
 
@@ -47,12 +149,19 @@ eleventyComputed:
 
 
 <style>
-.encoding { border: 1px solid #ddd; padding: 0.75rem; border-radius: 8px; }
-.bitfield { display: flex; gap: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.field { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 6px; text-align: center; }
-.field.const { background: #eef7ff; border-color: #cfe7ff; }
-.label { font-weight: 600; }
-.range { font-size: 0.8em; color: #555; }
+.bitfield-diagram {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  background: #fafafa;
+}
 .bits { margin-top: 0.5rem; color: #333; }
 body { font-family: system-ui, sans-serif; line-height: 1.5; }
+
+svg text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
 </style>
+
+<script src="/bitfield/build/bitfield.js"></script>

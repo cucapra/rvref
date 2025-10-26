@@ -136,10 +136,35 @@ module.exports = function loadInstructions() {
           funct7 = /^[01]{7}$/.test(f7) ? f7 : undefined;
         }
       }
-
+  /*
+    Construct a compact JSON description of the instruction bitfield layout.
+    This format is mainly for visualization of the bitfield diagram.
+    Example input from computeFields():
+    [
+      { label: "funct7=0000000", from: 31, to: 25, width: 7, kind: "const" },
+      { label: "rs2", from: 24, to: 20, width: 5, kind: "var" },
+      { label: "rs1", from: 19, to: 15, width: 5, kind: "var" },
+      { label: "funct3=000", from: 14, to: 12, width: 3, kind: "const" },
+      { label: "rd", from: 11, to: 7, width: 5, kind: "var" },
+      { label: "opcode=0110011", from: 6, to: 0, width: 7, kind: "const" }
+    ]
+    
+    We simplify that into a structure like:
+    {
+      reg: [
+        { name: "0000000", bits: 7 },
+        { name: "rs2", bits: 5 },
+        { name: "rs1", bits: 5 },
+        { name: "000", bits: 3 },
+        { name: "rd", bits: 5 },
+        { name: "0110011", bits: 7 }
+      ]
+    }
+    */
       const bitfieldJSON = {
         reg: fields.map(f => {
           let name = f.label;
+          // Constant fields have their label part before "=" removed (e.g., "funct7=0000000" → "0000000").
           if (f.kind === "const" && typeof name === "string") {
             const idx = name.indexOf("=");
             if (idx !== -1 && idx + 1 < name.length) {

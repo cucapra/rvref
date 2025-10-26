@@ -125,18 +125,11 @@ eleventyComputed:
   </script>
 
   <div class="bits">
-    {% for f in inst.encoding.fields %}
-      {% if "funct7" in f.label %}
-        <div><strong>funct7</strong>: bits {{ f.from }}..{{ f.to }}</div>
-      {% endif %}
-      {% if "funct3" in f.label %}
-        <div><strong>funct3</strong>: bits {{ f.from }}..{{ f.to }}</div>
-      {% endif %}
-      {% if "opcode" in f.label %}
-        <div><strong>opcode</strong>: bits {{ f.from }}..{{ f.to }}</div>
-      {% endif %}
-    {% endfor %}
+    {% if inst.encoding.funct7 %}<div><strong>funct7</strong>: {{ inst.encoding.funct7 }}</div>{% endif %}
+    {% if inst.encoding.funct3 %}<div><strong>funct3</strong>: {{ inst.encoding.funct3 }}</div>{% endif %}
+    {% if inst.encoding.opcode %}<div><strong>opcode</strong>: {{ inst.encoding.opcode }}</div>{% endif %}
   </div>
+
 </section>
 
 <section>

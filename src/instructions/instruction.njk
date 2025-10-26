@@ -22,107 +22,8 @@ eleventyComputed:
   <p><strong>Type:</strong> {{ inst.encodingType or "" }}</p>
 
   <div class="bitfield-diagram">
-    <script type="text/bitfield">
-    {{ inst.bitfieldJSON | dump | safe }}
-    </script>
+      {{ inst.bitfieldSVG | safe }}
   </div>
-
-  <script>
-  (function () {
-    function jsonmlToDom(node, inSvg) {
-      if (node === null || node === undefined) return null;
-      if (typeof node === "string" || typeof node === "number") {
-        return document.createTextNode(String(node));
-      }
-      if (!Array.isArray(node) || node.length === 0) return null;
-
-      const [tagName, ...rest] = node;
-      let attrs = {};
-      let children = rest;
-
-      if (children.length && typeof children[0] === "object" && !Array.isArray(children[0])) {
-        attrs = children.shift() || {};
-      }
-
-      const isSvgNode = inSvg || tagName === "svg";
-      const element = isSvgNode
-        ? document.createElementNS("http://www.w3.org/2000/svg", tagName)
-        : document.createElement(tagName);
-
-      Object.entries(attrs).forEach(([key, value]) => {
-        element.setAttribute(key, value);
-      });
-
-      children.forEach(child => {
-        const childNode = jsonmlToDom(child, isSvgNode);
-        if (childNode) element.appendChild(childNode);
-      });
-
-      return element;
-    }
-
-    function parseBitfieldData(raw) {
-      if (!raw) return null;
-      try {
-        const payload = JSON.parse(raw);
-        if (Array.isArray(payload)) {
-          return { segments: payload };
-        }
-        if (payload && Array.isArray(payload.reg)) {
-          return { segments: payload.reg, options: payload.options };
-        }
-        if (payload && Array.isArray(payload.fields)) {
-          return { segments: payload.fields, options: payload.options };
-        }
-      } catch (err) {
-        console.warn("Failed to parse bitfield JSON", err);
-      }
-      return null;
-    }
-
-    function renderBitfieldScripts() {
-      const scripts = document.querySelectorAll('script[type="text/bitfield"]');
-      if (!scripts.length) return;
-
-      scripts.forEach(scriptEl => {
-        const container = scriptEl.parentElement;
-        if (!container) return;
-
-        if (!window.bitfield || typeof window.bitfield.render !== "function") {
-          console.warn("bitfield.render is not available");
-          return;
-        }
-
-        const parsed = parseBitfieldData(scriptEl.textContent.trim());
-        if (!parsed || !Array.isArray(parsed.segments) || !parsed.segments.length) return;
-
-        const segments = parsed.segments
-          .map(seg => {
-            const bits = Number(seg.bits ?? seg.width ?? 0);
-            return Object.assign({}, seg, { bits });
-          })
-          .filter(seg => seg.bits > 0);
-
-        if (!segments.length) return;
-
-        const totalBits = segments.reduce((sum, seg) => sum + seg.bits, 0);
-        const options = Object.assign({ bits: totalBits }, parsed.options || {});
-
-        try {
-          const jsonml = window.bitfield.render(segments, options);
-          const svgNode = jsonmlToDom(jsonml, false);
-          if (svgNode) {
-            container.insertBefore(svgNode, scriptEl);
-          }
-        } catch (err) {
-          console.error("Failed to render bitfield", err);
-        }
-      });
-    }
-
-    document.addEventListener("DOMContentLoaded", renderBitfieldScripts);
-  })();
-  </script>
 
   <div class="bits">
     {% if inst.encoding.funct7 %}<div><strong>funct7</strong>: {{ inst.encoding.funct7 }}</div>{% endif %}
@@ -157,4 +58,3 @@ svg text {
 }
 </style>
 
-<script src="/bitfield/build/bitfield.js"></script>

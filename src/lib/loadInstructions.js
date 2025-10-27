@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// RISC-V Unified Database Instruction Loader
+// -----------------------------------------------------------------------------
+
+// This script loads RISC-V instruction YAML files from the Unified Database,
+// extracts encoding information (match bits + variable positions), and
+// generates compact bitfield layouts for visualization using `bit-field`.
+
+
 const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
@@ -12,12 +21,26 @@ function readYamlFile(p) {
   return yaml.load(txt);
 }
 
+/*
+Parse a match bit string (e.g., "0100000----------101-----0010011")
+into an array of single characters, each representing one bit.
+
+Returns null if the string isn’t 16 or 32 bits long.
+*/
 function parseMatchBits(matchStr) {
   if (!matchStr) return null;
   if (matchStr.length !== 32 && matchStr.length !== 16) return null;
   return matchStr.split("");
 }
 
+/*
+Parse a bitfield location string into numeric segments.
+Example:
+  "31-25|11-7" → [ {from:31,to:25}, {from:11,to:7} ]
+
+Each segment defines one contiguous region of bits, and fields can have
+multiple disjoint segments (like immediates in S- or B-type instructions).
+*/
 function parseLocationSegments(loc) {
   if (loc === undefined || loc === null) return [];
   return String(loc)
@@ -38,6 +61,21 @@ function parseLocationSegments(loc) {
     .sort((a, b) => (b.from - a.from) || (b.to - a.to));
 }
 
+
+/*
+Extract all variable and constant fields from an instruction definition.
+
+This function handles both flat encodings and multi-variant encodings
+(e.g., RV32 / RV64). It returns an array of field descriptors like:
+
+  [
+    { label: "funct7=0100000", from: 31, to: 25, width: 7, kind: "const" },
+    { label: "rs2", from: 24, to: 20, width: 5, kind: "var" },
+    ...
+  ]
+
+These field objects describe what appears at each bit position.
+*/
 function computeFields(doc) {
   const fields = [];
   if (!doc.encoding) return fields;
@@ -45,7 +83,7 @@ function computeFields(doc) {
   let enc = doc.encoding;
   if (!enc.match && !enc.variables) {
     // pick RV32 first, otherwise first available sub-encoding
-    const variants = Object.keys(enc);
+    const variants = Object.keys(enc); // e.g., ["RV32", "RV64"]
     const chosenKey = variants.includes("RV32") ? "RV32" : variants[0];
     enc = enc[chosenKey] || {};
   }
@@ -53,15 +91,19 @@ function computeFields(doc) {
   const match = parseMatchBits(enc.match || "");
   const vars = Array.isArray(enc.variables) ? enc.variables : [];
 
+  // --- Parse variable fields (e.g., rd, rs1, imm) ---
   for (const v of vars) {
     const segments = parseLocationSegments(v.location);
     if (segments.length === 0) continue;
+  // Find the overall high/low bits and width
     const from = Math.max(...segments.map(s => s.from));
     const to = Math.min(...segments.map(s => s.to));
     const width = segments.reduce((sum, s) => sum + (s.from - s.to + 1), 0);
     fields.push({ label: v.name, from, to, width, kind: "var", segments });
   }
 
+  // --- Parse constant bit regions from the match pattern ---
+  // (bits that are fixed 0/1, not "-")
   if (match) {
     let bit = match.length - 1;
     while (bit >= 0) {
@@ -122,11 +164,29 @@ function slugifyExtension(ext) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "unknown";
 }
+/*
+Example of expanding multi-segment fields into individual contiguous entries.
 
-function standardizeBitfieldFields(fields, totalBits = 32) {
+Before expansion:
+fields = [
+  { label: "imm", from: 31, to: 7, segments: [ { from: 31, to: 25 }, { from: 11, to: 7 } ] },
+]
+
+After expansion:
+expanded = [
+  { label: "imm", from: 31, to: 25 },
+  { label: "imm", from: 11, to: 7 }
+]
+
+This ensures that each disjoint bit range (like imm[31:25] and imm[11:7])
+is rendered as its own segment in the bitfield diagram rather than one
+continuous bar spanning bits 31–7.
+*/
+
+function expandBitfieldFields(fields, totalBits = 32) {
   const expanded = [];
 
-  // Step 1: Expand multi-segment fields into individual entries
+  // Expand multi-segment fields into individual entries
   for (const field of fields) {
     const segments = Array.isArray(field.segments) && field.segments.length
       ? field.segments
@@ -150,38 +210,8 @@ function standardizeBitfieldFields(fields, totalBits = 32) {
       });
     }
   }
-
-  // Step 2: Sort and fill gaps
-  expanded.sort((a, b) => b.from - a.from);
-  const filled = [];
-  let nextBit = totalBits - 1;
-
-  for (const seg of expanded) {
-    if (nextBit > seg.from) {
-      filled.push({
-        label: "",
-        from: nextBit,
-        to: seg.from + 1,
-        width: nextBit - seg.from,
-        kind: "gap"
-      });
-    }
-    filled.push(seg);
-    nextBit = seg.to - 1;
-  }
-
-  if (nextBit >= 0) {
-    filled.push({
-      label: "",
-      from: nextBit,
-      to: 0,
-      width: nextBit + 1,
-      kind: "gap"
-    });
-  }
-
-  filled.sort((a, b) => b.from - a.from);
-  return filled;
+   expanded.sort((a, b) => b.from - a.from);
+  return expanded;
 }
 
 
@@ -236,33 +266,9 @@ module.exports = function loadInstructions() {
           funct7 = /^[01]{7}$/.test(f7) ? f7 : undefined;
         }
       }
-  /*
-    Construct a compact JSON description of the instruction bitfield layout.
-    This format is mainly for visualization of the bitfield diagram.
-    Example input from computeFields():
-    [
-      { label: "funct7=0000000", from: 31, to: 25, width: 7, kind: "const" },
-      { label: "rs2", from: 24, to: 20, width: 5, kind: "var" },
-      { label: "rs1", from: 19, to: 15, width: 5, kind: "var" },
-      { label: "funct3=000", from: 14, to: 12, width: 3, kind: "const" },
-      { label: "rd", from: 11, to: 7, width: 5, kind: "var" },
-      { label: "opcode=0110011", from: 6, to: 0, width: 7, kind: "const" }
-    ]
-    
-    We simplify that into a structure like:
-    {
-      reg: [
-        { name: "0000000", bits: 7 },
-        { name: "rs2", bits: 5 },
-        { name: "rs1", bits: 5 },
-        { name: "000", bits: 3 },
-        { name: "rd", bits: 5 },
-        { name: "0110011", bits: 7 }
-      ]
-    }
-    */
+
       const totalBits = doc.encoding?.match?.length === 16 ? 16 : 32;
-      const filledFields = standardizeBitfieldFields(fields, totalBits);
+      const filledFields = expandBitfieldFields(fields, totalBits);
       const bitfieldJSON = {
         reg: filledFields.map(f => {
           let name = f.label;

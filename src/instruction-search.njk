@@ -1,0 +1,50 @@
+---
+title: Instruction Search
+permalink: search/index.html
+---
+<h1>Instruction Search</h1>
+
+<p>Search by mnemonic or long name. Hit Enter on an exact mnemonic match to jump straight to the instruction details.</p>
+
+<input id="search" placeholder="Search mnemonic, e.g. addi" style="padding:8px; width: 100%; max-width: 480px;" />
+
+<ul id="list">
+{% for inst in instructions %}
+  <li data-name="{{ inst.name }} {{ inst.longName | lower }}">
+    <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
+  </li>
+{% endfor %}
+</ul>
+
+<script>
+const input = document.getElementById('search');
+const list = document.getElementById('list');
+const items = Array.from(list.querySelectorAll('li'));
+input.addEventListener('input', () => {
+  const q = input.value.trim().toLowerCase();
+  for (const li of items) {
+    const txt = li.getAttribute('data-name');
+    li.style.display = (!q || txt.includes(q)) ? '' : 'none';
+  }
+  // If exact mnemonic match, navigate on Enter
+});
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const q = input.value.trim().toLowerCase();
+    if (!q) return;
+    const exact = items.find(li => li.querySelector('a').textContent.toLowerCase() === q);
+    if (exact) {
+      location.href = exact.querySelector('a').getAttribute('href');
+    }
+  }
+});
+</script>
+
+<style>
+body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+ul { list-style: none; padding: 0; }
+li { margin: 6px 0; }
+a { text-decoration: none; color: #0366d6; }
+a:hover { text-decoration: underline; }
+</style>
+

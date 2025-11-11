@@ -23,6 +23,9 @@ permalink: search/index.html
     data-extension-slug="{{ inst.extensionSlug }}"
   >
     <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
+    <span class="ext-name" data-ext-slug="{{ inst.extensionSlug }}" title="Extension">
+    - {{ inst.extension }}
+    </span>
   </li>
 {% endfor %}
 </ul>

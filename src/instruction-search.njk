@@ -1,0 +1,144 @@
+---
+title: Instruction Search
+permalink: search/index.html
+---
+<h1>Instruction Search</h1>
+
+<p>Search by mnemonic or long name. Hit Enter on an exact mnemonic match to jump straight to the instruction details.</p>
+
+<input id="search" placeholder="Search mnemonic, e.g. addi" style="padding:8px; width: 100%; max-width: 480px;" />
+
+{# Creates box divide between checkboxes and rest of page #}
+<fieldset id="extension-filters-fieldset" class="filters">
+  <legend>Filter by extension</legend>
+  <div id="extension-filters" class="filter-options"></div>
+</fieldset>
+
+<ul id="list">
+{% for inst in instructions %}
+  <li
+    data-search="{{ (inst.name ~ ' ' ~ inst.longName) | lower }}"
+    data-mnemonic="{{ inst.name | lower }}"
+    data-extension="{{ inst.extension }}"
+    data-extension-slug="{{ inst.extensionSlug }}"
+  >
+    <a href="/instructions/{{ inst.name }}/">{{ inst.name }}</a>
+    <span class="ext-name" data-ext-slug="{{ inst.extensionSlug }}" title="Extension">
+    - {{ inst.extension }}
+    </span>
+  </li>
+{% endfor %}
+</ul>
+
+<script>
+const input = document.getElementById('search');
+const list = document.getElementById('list');
+const filtersFieldset = document.getElementById('extension-filters-fieldset');
+{# the blank area where we’ll insert checkboxes #}
+const filtersContainer = document.getElementById('extension-filters');
+const items = Array.from(list.querySelectorAll('li'));
+const activeExtensions = new Set();
+
+const extensionMap = new Map();
+for (const li of items) {
+  const slug = li.dataset.extensionSlug;
+  const extension = li.dataset.extension;
+  if (slug && extension && !extensionMap.has(slug)) {
+    extensionMap.set(slug, { extension, slug });
+  }
+}
+
+const extensions = Array.from(extensionMap.values()).sort((a, b) => a.extension.localeCompare(b.extension));
+if (extensions.length === 0 && filtersFieldset) {
+  filtersFieldset.style.display = 'none';
+} else {
+  for (const { extension, slug } of extensions) {
+    const id = `ext-${slug}`;
+    const label = document.createElement('label');
+    label.className = 'filter-option';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = extension;
+    checkbox.id = id;
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) {
+        activeExtensions.add(extension);
+      } else {
+        activeExtensions.delete(extension);
+      }
+      applyFilters();
+    });
+
+    const text = document.createElement('span');
+    text.textContent = extension;
+
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    filtersContainer.appendChild(label);
+  }
+}
+
+function applyFilters() {
+  const q = input.value.trim().toLowerCase();
+  const filtersActive = activeExtensions.size > 0;
+  for (const li of items) {
+
+    {# Check if the item matches the text search
+       - If the search box is empty, match everything
+       - Otherwise, match if the search string includes the query #}
+    const matchesQuery = !q || (li.dataset.search || '').includes(q);
+
+    {# Check if the item matches an active extension filter
+       - If no filters are active, match everything
+       - Otherwise, show only if its extension is selected #}
+    const matchesExtension = !filtersActive || activeExtensions.has(li.dataset.extension);
+
+    {# Show or hide this <li> depending on whether both match conditions are true #}
+    li.style.display = (matchesQuery && matchesExtension) ? '' : 'none';
+  }
+}
+
+input.addEventListener('input', applyFilters);
+
+input.addEventListener('keydown', (e) => {
+  {# Only act if Enter is pressed #}
+  if (e.key !== 'Enter') return;
+
+  const q = input.value.trim().toLowerCase();
+
+  {# Do nothing if the box is empty #}
+  if (!q) return;
+
+  const filtersActive = activeExtensions.size > 0;
+
+  {# Look for an exact mnemonic match among all instructions
+     - If filters are active, also ensure it belongs to one of the selected extensions #}
+  const exact = items.find(li => {
+    if (li.dataset.mnemonic !== q) return false;
+    if (!filtersActive) return true;
+    return activeExtensions.has(li.dataset.extension);
+  });
+
+  {# If an exact match is found, redirect to that instruction's detail page #}
+  if (exact) {
+    const link = exact.querySelector('a').getAttribute('href');
+    location.href = link;
+  }
+});
+
+applyFilters();
+</script>
+
+<style>
+body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+ul { list-style: none; padding: 0; }
+li { margin: 6px 0; }
+a { text-decoration: none; color: #0366d6; }
+a:hover { text-decoration: underline; }
+#extension-filters-fieldset { margin: 1rem 0; padding: 0.75rem 1rem; border: 1px solid #d0d7de; border-radius: 6px; }
+#extension-filters-fieldset legend { font-weight: 600; font-size: 0.95rem; padding: 0 6px; }
+.filter-options { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.5rem; align-items: center; }
+.filter-option { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.95rem; white-space: nowrap; }
+.filter-option input { width: 16px; height: 16px; }
+</style>

@@ -1,6 +1,17 @@
+// -----------------------------------------------------------------------------
+// RISC-V Unified Database Instruction Loader
+// -----------------------------------------------------------------------------
+
+// This script loads RISC-V instruction YAML files from the Unified Database,
+// extracts encoding information (match bits + variable positions), and
+// generates compact bitfield layouts for visualization using `bit-field`.
+
+
 const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
+const render = require("bit-field/lib/render");
+const onml = require("onml");
 
 const INST_ROOT = path.join(process.cwd(), "riscv-unified-db", "spec", "std", "isa", "inst");
 let cache = null;
@@ -10,46 +21,115 @@ function readYamlFile(p) {
   return yaml.load(txt);
 }
 
+/*
+Parse a match bit string (e.g., "0100000----------101-----0010011")
+into an array of single characters, each representing one bit.
+
+Returns null if the string isn’t 16 or 32 bits long.
+*/
 function parseMatchBits(matchStr) {
-  if (!matchStr || matchStr.length !== 32) return null;
+  if (!matchStr) return null;
+  if (matchStr.length !== 32 && matchStr.length !== 16) return null;
   return matchStr.split("");
 }
 
+/*
+Parse a bitfield location string into numeric segments.
+Example:
+  "31-25|11-7" → [ {from:31,to:25}, {from:11,to:7} ]
+
+Each segment defines one contiguous region of bits, and fields can have
+multiple disjoint segments (like immediates in S- or B-type instructions).
+*/
+function parseLocationSegments(loc) {
+  if (loc === undefined || loc === null) return [];
+  return String(loc)
+    .split("|")
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => {
+      const [hiStr, loStr] = part.split("-").map(n => n.trim());
+      const hi = parseInt(hiStr, 10);
+      const lo = loStr !== undefined && loStr !== "" ? parseInt(loStr, 10) : hi;
+      if (Number.isNaN(hi) || Number.isNaN(lo)) return null;
+      return {
+        from: Math.max(hi, lo),
+        to: Math.min(hi, lo)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.from - a.from) || (b.to - a.to));
+}
+
+
+/*
+Extract all variable and constant fields from an instruction definition.
+
+This function handles both flat encodings and multi-variant encodings
+(e.g., RV32 / RV64). It returns an array of field descriptors like:
+
+  [
+    { label: "funct7=0100000", from: 31, to: 25, width: 7, kind: "const" },
+    { label: "rs2", from: 24, to: 20, width: 5, kind: "var" },
+    ...
+  ]
+
+These field objects describe what appears at each bit position.
+*/
 function computeFields(doc) {
   const fields = [];
   if (!doc.encoding) return fields;
-  const match = parseMatchBits(doc.encoding.match || "");
-  const vars = Array.isArray(doc.encoding.variables) ? doc.encoding.variables : [];
+
+  let enc = doc.encoding;
+  if (!enc.match && !enc.variables) {
+    // pick RV32 first, otherwise first available sub-encoding
+    const variants = Object.keys(enc); // e.g., ["RV32", "RV64"]
+    const chosenKey = variants.includes("RV32") ? "RV32" : variants[0];
+    enc = enc[chosenKey] || {};
+  }
+
+  const match = parseMatchBits(enc.match || "");
+  const vars = Array.isArray(enc.variables) ? enc.variables : [];
+
+  // --- Parse variable fields (e.g., rd, rs1, imm) ---
   for (const v of vars) {
-    const loc = String(v.location);
-    let hi;
-    let lo;
-    if (loc.includes("-")) {
-      [hi, lo] = loc.split("-").map(n => parseInt(n, 10));
-    } else {
-      hi = lo = parseInt(loc, 10);
-    }
-    const width = hi - lo + 1;
-    fields.push({ label: v.name, from: hi, to: lo, width, kind: "var" });
+    const segments = parseLocationSegments(v.location);
+    if (segments.length === 0) continue;
+  // Find the overall high/low bits and width
+    const from = Math.max(...segments.map(s => s.from));
+    const to = Math.min(...segments.map(s => s.to));
+    const width = segments.reduce((sum, s) => sum + (s.from - s.to + 1), 0);
+    fields.push({ label: v.name, from, to, width, kind: "var", segments });
   }
+
+  // --- Parse constant bit regions from the match pattern ---
+  // (bits that are fixed 0/1, not "-")
   if (match) {
-    const sliceBits = (hi, lo) => match.slice(31 - hi, 32 - lo).join("");
-    const opcode = sliceBits(6, 0);
-    if (/^[01]{7}$/.test(opcode)) {
-      fields.push({ label: "opcode=" + opcode, from: 6, to: 0, width: 7, kind: "const" });
-    }
-    const funct3 = sliceBits(14, 12);
-    if (/^[01]{3}$/.test(funct3)) {
-      fields.push({ label: "funct3=" + funct3, from: 14, to: 12, width: 3, kind: "const" });
-    }
-    const funct7 = sliceBits(31, 25);
-    if (/^[01]{7}$/.test(funct7) && !/^[-]{7}$/.test(funct7)) {
-      fields.push({ label: "funct7=" + funct7, from: 31, to: 25, width: 7, kind: "const" });
+    let bit = match.length - 1;
+    while (bit >= 0) {
+      const hi = bit;
+      while (bit >= 0 && match[match.length - 1 - bit] !== "-") bit--;
+      const lo = bit + 1;
+      const width = hi - lo + 1;
+      if (width <= 0) { bit--; continue; }
+
+      const bits = match.slice(match.length - 1 - hi, match.length - lo).join("");
+
+      // Label common constant fields if their positions match
+      let label = bits;
+      if (hi === 31 && lo === 25) label = `funct7=${bits}`;
+      else if (hi === 14 && lo === 12) label = `funct3=${bits}`;
+      else if (hi === 6 && lo === 0) label = `opcode=${bits}`;
+      else label = `const=${bits}`;
+
+      fields.push({ label, from: hi, to: lo, width, kind: "const" });
     }
   }
+
   fields.sort((a, b) => b.from - a.from);
   return fields;
 }
+
 
 function detectEncodingType(doc) {
   if (!doc.encoding || !Array.isArray(doc.encoding.variables)) return undefined;
@@ -84,6 +164,56 @@ function slugifyExtension(ext) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "unknown";
 }
+/*
+Example of expanding multi-segment fields into individual contiguous entries.
+
+Before expansion:
+fields = [
+  { label: "imm", from: 31, to: 7, segments: [ { from: 31, to: 25 }, { from: 11, to: 7 } ] },
+]
+
+After expansion:
+expanded = [
+  { label: "imm", from: 31, to: 25 },
+  { label: "imm", from: 11, to: 7 }
+]
+
+This ensures that each disjoint bit range (like imm[31:25] and imm[11:7])
+is rendered as its own segment in the bitfield diagram rather than one
+continuous bar spanning bits 31–7.
+*/
+
+function expandBitfieldFields(fields, totalBits = 32) {
+  const expanded = [];
+
+  // Expand multi-segment fields into individual entries
+  for (const field of fields) {
+    const segments = Array.isArray(field.segments) && field.segments.length
+      ? field.segments
+      : [{ from: field.from, to: field.to }];
+
+    for (const seg of segments) {
+      const hi = seg.from;
+      const lo = seg.to;
+      const width = hi - lo + 1;
+      if (width <= 0) continue;
+      const label =
+        segments.length > 1
+          ? `${field.label}`
+          : field.label;
+      expanded.push({
+        label,
+        from: hi,
+        to: lo,
+        width,
+        kind: field.kind
+      });
+    }
+  }
+   expanded.sort((a, b) => b.from - a.from);
+  return expanded;
+}
+
 
 module.exports = function loadInstructions() {
   if (cache) return cache;
@@ -137,6 +267,34 @@ module.exports = function loadInstructions() {
         }
       }
 
+      const totalBits = doc.encoding?.match?.length === 16 ? 16 : 32;
+      const filledFields = expandBitfieldFields(fields, totalBits);
+      const bitfieldJSON = {
+        reg: filledFields.map(f => {
+          let name = f.label;
+          // Constant fields have their label part before "=" removed (e.g., "funct7=0000000" → "0000000").
+          if (f.kind === "const" && typeof name === "string") {
+            const idx = name.indexOf("=");
+            if (idx !== -1 && idx + 1 < name.length) {
+              name = name.slice(idx + 1);
+            }
+          }
+          return {
+            name,
+            bits: f.width
+          };
+        })
+      };
+
+      let bitfieldSVG = "";
+      try {
+        const segments = bitfieldJSON.reg.slice().reverse();
+        const jsonml = render(segments, { bits: totalBits, vflip: false }); // MSB→LSB order
+        bitfieldSVG = onml.stringify(jsonml);
+      } catch (err) {
+        console.warn(`Failed to render SVG for ${name}:`, err);
+      }
+
       instructions.push({
         name,
         longName,
@@ -155,7 +313,8 @@ module.exports = function loadInstructions() {
           funct7
         },
         extension,
-        extensionSlug: slugifyExtension(extension)
+        extensionSlug: slugifyExtension(extension),
+        bitfieldSVG
       });
     }
   }
